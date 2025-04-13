@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: incluster-client-go
+  name: incluster-client-go
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: incluster-client-go
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: incluster-client-go
+    spec:
+      containers:
+      # - image: viveksinghggits/lister:0.1.0 // this image does not handle if config file is not present
+                                              # present at .kube location
+      - image: viveksinghggits/lister:0.1.1 # with this handling config file error but default service
+                                            # account cannot list pods
+        name: incluster-client-go
+        resources: {}
+status: {}
