@@ -5,7 +5,7 @@ import (
 	"flag"
 	"time"
 
-	"github.com/kama001/client-go/ekspose/customcontroller"
+	"github.com/kama001/client-go/ekspose/customctrlwithqueue"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -18,7 +18,7 @@ func main() {
 	ch := make(chan struct{})
 	ns := "default"
 	informers := informers.NewSharedInformerFactoryWithOptions(clientset, 10*time.Minute, informers.WithNamespace(ns))
-	c := customcontroller.NewController(*clientset, informers.Apps().V1().Deployments())
+	c := customctrlwithqueue.NewController(*clientset, informers.Apps().V1().Deployments())
 	informers.Start(ch)
 	c.Run(ch)
 }
