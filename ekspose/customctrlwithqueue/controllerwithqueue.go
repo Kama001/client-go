@@ -18,7 +18,7 @@ import (
 
 type controller struct {
 	clientset      kubernetes.Clientset
-	depCacheSynced cache.InformerSynced
+	depCacheSynced cache.InformerSynced // InformerSynced = func() bool
 	// queue          workqueue.TypedRateLimitingInterface[string]
 	queue     workqueue.RateLimitingInterface
 	depLister appslisters.DeploymentLister
@@ -26,24 +26,42 @@ type controller struct {
 
 func NewController(clientset kubernetes.Clientset, depInformer appsinformers.DeploymentInformer) *controller {
 	c := &controller{
-		clientset:      clientset,
-		depCacheSynced: depInformer.Informer().HasSynced,
+		clientset: clientset,
+		// redfer /lhome/kcharan/go_bacics/interface for examples
+		depCacheSynced: depInformer.Informer().HasSynced, // HasSynced means func() bool, HasSynced() means bool
 		// queue:          workqueue.NewTypedRateLimitingQueue[string](workqueue.NewTypedItemExponentialFailureRateLimiter[string](1*time.Second, 30*time.Second)),
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(),
 			"ekspose"),
 		depLister: depInformer.Lister(),
 	}
+	// depInformer.Informer().SharedInformer.AddEventhandler
+	// AddEventHandler(handler ResourceEventhandler)
+	// type ResourceEventHandler interface {
+	// 	OnAdd(obj interface{}, isInInitialList bool)
+	// 	OnUpdate(oldObj, newObj interface{})
+	// 	OnDelete(obj interface{})
+	// }
+
 	depInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerDetailedFuncs{
 			AddFunc:    c.handleAdd,
 			DeleteFunc: c.handleDel,
 		},
 	)
+	// func (r ResourceEventHandlerDetailedFuncs) OnAdd(obj interface{}) {
+	// 	if r.AddFunc != nil {
+	// 		r.AddFunc(obj) // ← 💥 YOUR function gets called here
+	// 	}
+	// }
 	return c
 }
 
 func (c *controller) Run(ch chan struct{}) {
 	fmt.Println("starting controller")
+	// WaitForCacheSync waits for caches to populate.
+	// It returns true if it was successful,
+	// false if the controller should shutdown callers should prefer WaitForNamedCacheSync()
+	// c.depCacheSynced = func() bool
 	if !cache.WaitForCacheSync(ch, c.depCacheSynced) {
 		fmt.Print("waiting for cache to be synced\n")
 	}
