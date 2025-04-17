@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: ekspose
+  name: ekspose
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ekspose
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ekspose
+    spec:
+      containers:
+      - image: stark985/ekspose:0.1.1
+        name: ekspose
+        resources: {}
+status: {}
