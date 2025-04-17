@@ -7,6 +7,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -57,7 +58,7 @@ func NewController(clientset kubernetes.Clientset, depInformer appsinformers.Dep
 }
 
 func (c *controller) Run(ch chan struct{}) {
-	fmt.Println("starting controller")
+	fmt.Println("⏳ starting controller")
 	// WaitForCacheSync waits for caches to populate.
 	// It returns true if it was successful,
 	// false if the controller should shutdown callers should prefer WaitForNamedCacheSync()
@@ -92,6 +93,18 @@ func (c *controller) processItem() bool {
 		fmt.Printf("splitting key into namespace and name %s\n", err.Error())
 		return false
 	}
+	ctx := context.Background()
+	_, err = c.clientset.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+
+		err := c.clientset.CoreV1().Services(ns).Delete(ctx, name, metav1.DeleteOptions{})
+		if err != nil {
+			fmt.Printf("deleting service %s\n", name)
+			return false
+		}
+		fmt.Printf("❌ deployment %s deleted\n", name)
+		return true
+	}
 	err = c.syncDeployment(ns, name)
 	if err != nil {
 		fmt.Printf("syncing deployment %s\n", err.Error())
@@ -108,13 +121,6 @@ func (c *controller) syncDeployment(ns, name string) error {
 		return err
 	}
 	port := c.getContainerPorts(dep)
-	fmt.Println(port)
-	var labelK, labelV string
-	for k, v := range dep.Labels {
-		labelK, labelV = k, v
-		break
-	}
-	fmt.Println(labelK, labelV)
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: dep.Name,
@@ -126,17 +132,15 @@ func (c *controller) syncDeployment(ns, name string) error {
 					Port: port,
 				},
 			},
-			Selector: map[string]string{
-				labelK: labelV,
-			},
-			Type: corev1.ServiceTypeClusterIP,
+			Selector: dep.Labels,
+			Type:     corev1.ServiceTypeClusterIP,
 		},
 	}
 	svc, err := c.clientset.CoreV1().Services(ns).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 
 	}
-	fmt.Printf("service %s created\n", svc.Name)
+	fmt.Printf("🆕 service %s created\n", svc.Name)
 	return nil
 }
 func (c *controller) getContainerPorts(dep *appsv1.Deployment) int32 {
@@ -157,7 +161,7 @@ func getDetails(obj interface{}) (string, string) {
 }
 
 func (c *controller) handleAdd(obj interface{}, isInIntialList bool) {
-	fmt.Println("add was called")
+	// fmt.Println("add was called")
 	// key, _ := cache.MetaNamespaceKeyFunc(obj)
 	// fmt.Println(cache.SplitMetaNamespaceKey(key))
 	// ns, name := getDetails(obj)
@@ -168,9 +172,10 @@ func (c *controller) handleAdd(obj interface{}, isInIntialList bool) {
 }
 
 func (c *controller) handleDel(obj interface{}) {
-	fmt.Println("del was called")
-	ns, name := getDetails(obj)
-	if ns != "" && name != "" {
-		fmt.Printf("❌ Deployment Deleted:%s/%s\n", ns, name)
-	}
+	// fmt.Println("del was called")
+	// ns, name := getDetails(obj)
+	// if ns != "" && name != "" {
+	// 	fmt.Printf("❌ Deployment Deleted:%s/%s\n", ns, name)
+	// }
+	c.queue.Add(obj)
 }
